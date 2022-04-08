@@ -1,24 +1,24 @@
-import numpy as np
-from torch.utils.data import Dataset
-from imresize import imresize
-from util import read_image, create_gradient_map, im2tensor, create_probability_map, nn_interpolation
+# code modified from https://github.com/sefibk/KernelGAN/blob/master/data.py
 
+import numpy as np
+import torch
+from imresize import imresize
+from torch.utils.data import Dataset
+from utils import read_DEM, normalize, create_gradient_map, create_probability_map, nn_interpolation, im2tensor
+from config import Config
+import time
+from tqdm import tqdm
 
 class DataGenerator(Dataset):
-    """
-    The data generator loads an image once, calculates it's gradient map on initialization and then outputs a cropped version
-    of that image whenever called.
-    """
 
-    def __init__(self, conf, gan):
+    def __init__(self, conf):
         # Default shapes
         self.g_input_shape = conf.input_crop_size
-        self.d_input_shape = gan.G.output_size  # shape entering D downscaled by G
-        self.d_output_shape = self.d_input_shape - gan.D.forward_shave
+        self.d_input_shape = int(conf.input_crop_size * 0.5)  # shape entering D downscaled by G
+        self.d_output_shape = self.d_input_shape - 0.0
 
-        # Read input image
-        self.input_image = read_image(conf.input_image_path) / 255.
-        self.shave_edges(scale_factor=conf.scale_factor, real_image=conf.real_image)
+        self.input_image = read_DEM(conf.input_DEM_path)
+        self.shave_edges(scale_factor=conf.scale_factor)
 
         self.in_rows, self.in_cols = self.input_image.shape[0:2]
 
@@ -41,7 +41,8 @@ class DataGenerator(Dataset):
         top, left = self.get_top_left(size, for_g, idx)
         crop_im = self.input_image[top:top + size, left:left + size, :]
         if not for_g:  # Add noise to the image for d
-            crop_im += np.random.randn(*crop_im.shape) / 255.0
+            crop_im += np.random.randn(*crop_im.shape) 
+            crop_im = normalize(crop_im)
         return im2tensor(crop_im)
 
     def make_list_of_crop_indices(self, conf):
@@ -50,7 +51,7 @@ class DataGenerator(Dataset):
         crop_indices_for_g = np.random.choice(a=len(prob_map_sml), size=iterations, p=prob_map_sml)
         crop_indices_for_d = np.random.choice(a=len(prob_map_big), size=iterations, p=prob_map_big)
         return crop_indices_for_g, crop_indices_for_d
-
+    
     def create_prob_maps(self, scale_factor):
         # Create loss maps for input image and downscaled one
         loss_map_big = create_gradient_map(self.input_image)
@@ -59,17 +60,16 @@ class DataGenerator(Dataset):
         prob_map_big = create_probability_map(loss_map_big, self.d_input_shape)
         prob_map_sml = create_probability_map(nn_interpolation(loss_map_sml, int(1 / scale_factor)), self.g_input_shape)
         return prob_map_big, prob_map_sml
-
-    def shave_edges(self, scale_factor, real_image):
+    
+    def shave_edges(self, scale_factor):
         """Shave pixels from edges to avoid code-bugs"""
         # Crop 10 pixels to avoid boundaries effects in synthetically generated examples
-        if not real_image:
-            self.input_image = self.input_image[10:-10, 10:-10, :]
+        self.input_image = self.input_image[10:-10, 10:-10, :]
         # Crop pixels for the shape to be divisible by the scale factor
         sf = int(1 / scale_factor)
         shape = self.input_image.shape
         self.input_image = self.input_image[:-(shape[0] % sf), :, :] if shape[0] % sf > 0 else self.input_image
-        self.input_image = self.input_image[:, :-(shape[1] % sf), :] if shape[1] % sf > 0 else self.input_image
+        self.input_image = self.input_image[:, :-(shape[1] % sf), :] if shape[1] % sf > 0 else self.input_image    
 
     def get_top_left(self, size, for_g, idx):
         """Translate the center of the index of the crop to it's corresponding top-left"""
@@ -77,4 +77,15 @@ class DataGenerator(Dataset):
         row, col = int(center / self.in_cols), center % self.in_cols
         top, left = min(max(0, row - size // 2), self.in_rows - size), min(max(0, col - size // 2), self.in_cols - size)
         # Choose even indices (to avoid misalignment with the loss map for_g)
-        return top - top % 2, left - left % 2
+        return int(top - top % 2), int(left - left % 2)
+
+if __name__ == "__main__":
+    conf = Config()
+    st = time.time()
+    data_loader = DataGenerator(conf.parse())
+    end = time.time()
+    print("succesfully loaded data in %s seconds..." % (end-st))
+    for i in range(10):
+        g_in, d_in = data_loader[i]
+        print(f"idx: {i} g_in.shape = {g_in.shape} d_in.shape = {d_in.shape}")
+

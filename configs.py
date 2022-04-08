@@ -11,7 +11,7 @@ class Config:
 
         # Paths
         self.parser.add_argument('--img_name', default='image1', help='image name for saving purposes')
-        self.parser.add_argument('--input_image_path', default=os.path.dirname(__file__) + '/training_data/input.png', help='path to one specific image file')
+        self.parser.add_argument('--input_DEM_path', default='../Dataset/Bryce_Canyon.asc', help='path to one specific image file')
         self.parser.add_argument('--output_dir_path', default=os.path.dirname(__file__) + '/results', help='results path')
 
         # Sizes
@@ -48,7 +48,7 @@ class Config:
     def parse(self, args=None):
         """Parse the configuration"""
         self.conf = self.parser.parse_args(args=args)
-        self.set_gpu_device()
+        #self.set_gpu_device()
         self.clean_file_name()
         self.set_output_directory()
         self.conf.G_structure = [7, 5, 3, 1, 1, 1]
@@ -57,7 +57,7 @@ class Config:
 
     def clean_file_name(self):
         """Retrieves the clean image file_name for saving purposes"""
-        self.conf.img_name = self.conf.input_image_path.split('/')[-1].replace('ZSSR', '') \
+        self.conf.img_name = self.conf.input_DEM_path.split('/')[-1].replace('ZSSR', '') \
             .replace('real', '').replace('__', '').split('_.')[0].split('.')[0]
 
     def set_gpu_device(self):
