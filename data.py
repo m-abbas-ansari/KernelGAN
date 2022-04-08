@@ -4,20 +4,20 @@ import numpy as np
 import torch
 from imresize import imresize
 from torch.utils.data import Dataset
-from utils import read_DEM, normalize, create_gradient_map, create_probability_map, nn_interpolation, im2tensor
-from config import Config
+from util import read_DEM, normalize, create_gradient_map, create_probability_map, nn_interpolation, im2tensor
+from configs import Config
 import time
 from tqdm import tqdm
 
 class DataGenerator(Dataset):
 
-    def __init__(self, conf):
+    def __init__(self, conf, gan):
         # Default shapes
         self.g_input_shape = conf.input_crop_size
-        self.d_input_shape = int(conf.input_crop_size * 0.5)  # shape entering D downscaled by G
-        self.d_output_shape = self.d_input_shape - 0.0
+        self.d_input_shape = gan.G.output_size   # shape entering D downscaled by G
+        self.d_output_shape = self.d_input_shape - gan.D.forward_shave
 
-        self.input_image = read_DEM(conf.input_DEM_path)
+        self.input_image = read_DEM(conf.input_image_path)
         self.shave_edges(scale_factor=conf.scale_factor)
 
         self.in_rows, self.in_cols = self.input_image.shape[0:2]
@@ -49,6 +49,7 @@ class DataGenerator(Dataset):
         iterations = conf.max_iters
         prob_map_big, prob_map_sml = self.create_prob_maps(scale_factor=conf.scale_factor)
         crop_indices_for_g = np.random.choice(a=len(prob_map_sml), size=iterations, p=prob_map_sml)
+        #print(f'crop indices for g = {crop_indices_for_g}')
         crop_indices_for_d = np.random.choice(a=len(prob_map_big), size=iterations, p=prob_map_big)
         return crop_indices_for_g, crop_indices_for_d
     
@@ -56,9 +57,12 @@ class DataGenerator(Dataset):
         # Create loss maps for input image and downscaled one
         loss_map_big = create_gradient_map(self.input_image)
         loss_map_sml = create_gradient_map(imresize(im=self.input_image, scale_factor=scale_factor, kernel='cubic'))
+        #print(f'size of loss_map_big = {loss_map_big.shape} size of prob_map_sml = {loss_map_sml.shape}')
+
         # Create corresponding probability maps
         prob_map_big = create_probability_map(loss_map_big, self.d_input_shape)
         prob_map_sml = create_probability_map(nn_interpolation(loss_map_sml, int(1 / scale_factor)), self.g_input_shape)
+        #print(f'size of prob_map_big = {prob_map_big.shape} size of prob_map_sml = {prob_map_sml.shape}')
         return prob_map_big, prob_map_sml
     
     def shave_edges(self, scale_factor):

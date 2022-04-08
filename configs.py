@@ -11,12 +11,12 @@ class Config:
 
         # Paths
         self.parser.add_argument('--img_name', default='image1', help='image name for saving purposes')
-        self.parser.add_argument('--input_DEM_path', default='../Dataset/Bryce_Canyon.asc', help='path to one specific image file')
+        self.parser.add_argument('--input_image_path', default='../../Dataset/Bryce_Canyon.asc', help='path to one specific image file')
         self.parser.add_argument('--output_dir_path', default=os.path.dirname(__file__) + '/results', help='results path')
 
         # Sizes
         self.parser.add_argument('--input_crop_size', type=int, default=64, help='Generators crop size')
-        self.parser.add_argument('--scale_factor', type=float, default=0.5, help='The downscaling scale factor')
+        self.parser.add_argument('--scale_factor', type=float, default=0.25, help='The downscaling scale factor')
         self.parser.add_argument('--X4', action='store_true', help='The wanted SR scale factor')
 
         # Network architecture
@@ -27,7 +27,7 @@ class Config:
         self.parser.add_argument('--D_kernel_size', type=int, default=7, help='Discriminators convolution kernels size')
 
         # Iterations
-        self.parser.add_argument('--max_iters', type=int, default=3000, help='# of iterations')
+        self.parser.add_argument('--max_iters', type=int, default=10, help='# of iterations')
 
         # Optimization hyper-parameters
         self.parser.add_argument('--g_lr', type=float, default=2e-4, help='initial learning rate for generator')
@@ -57,7 +57,7 @@ class Config:
 
     def clean_file_name(self):
         """Retrieves the clean image file_name for saving purposes"""
-        self.conf.img_name = self.conf.input_DEM_path.split('/')[-1].replace('ZSSR', '') \
+        self.conf.img_name = self.conf.input_image_path.split('/')[-1].replace('ZSSR', '') \
             .replace('real', '').replace('__', '').split('_.')[0].split('.')[0]
 
     def set_gpu_device(self):
