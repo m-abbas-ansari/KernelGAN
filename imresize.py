@@ -162,7 +162,7 @@ def numeric_kernel(im, kernel, scale_factor, output_shape, kernel_shift_flag):
     # First run a correlation (convolution with flipped kernel)
     im = np.squeeze(im)
     out_im = np.zeros_like(im)
-    out_im = filters.correlate(kernel)
+    out_im = filters.correlate(im, kernel)
 
     # Then subsample and return
     return out_im[np.round(np.linspace(0, im.shape[0] - 1 / scale_factor[0], output_shape[0])).astype(int)[:, None],
