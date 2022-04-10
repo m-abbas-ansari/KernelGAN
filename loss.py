@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from util import shave_a2b, resize_tensor_w_kernel, create_penalty_mask, map2tensor
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # noinspection PyUnresolvedReferences
 class GANLoss(nn.Module):
@@ -16,8 +17,8 @@ class GANLoss(nn.Module):
         # Make a shape
         d_last_layer_shape = [1, 1, d_last_layer_size, d_last_layer_size]
         # The two possible label maps are pre-prepared
-        self.label_tensor_fake = Variable(torch.zeros(d_last_layer_shape), requires_grad=False)
-        self.label_tensor_real = Variable(torch.ones(d_last_layer_shape), requires_grad=False)
+        self.label_tensor_fake = Variable(torch.zeros(d_last_layer_shape).to(device), requires_grad=False)
+        self.label_tensor_real = Variable(torch.ones(d_last_layer_shape).to(device), requires_grad=False)
 
     def forward(self, d_last_layer, is_d_input_real):
         # Determine label map according to whether current input to discriminator is real or fake
@@ -40,7 +41,7 @@ class DownScaleLoss(nn.Module):
                      [-.0013275146484380, -0.0039825439453125, 0.0128326416015625, 0.0491180419921875, 0.0491180419921875, 0.0128326416015625, -0.0039825439453125, -0.0013275146484375],
                      [0.0004119873046875, 0.0012359619140625, -0.0039825439453125, -0.0152435302734375, -0.0152435302734375, -0.0039825439453125, 0.0012359619140625, 0.0004119873046875],
                      [0.0001373291015625, 0.0004119873046875, -0.0013275146484375, -0.0050811767578125, -0.0050811767578125, -0.0013275146484375, 0.0004119873046875, 0.0001373291015625]]
-        self.bicubic_kernel = Variable(torch.Tensor(bicubic_k), requires_grad=False)
+        self.bicubic_kernel = Variable(torch.Tensor(bicubic_k).to(device), requires_grad=False)
         self.scale_factor = scale_factor
 
     def forward(self, g_input, g_output):
@@ -65,9 +66,9 @@ class CentralizedLoss(nn.Module):
 
     def __init__(self, k_size, scale_factor=.5):
         super(CentralizedLoss, self).__init__()
-        self.indices = Variable(torch.arange(0., float(k_size)), requires_grad=False)
+        self.indices = Variable(torch.arange(0., float(k_size)).to(device), requires_grad=False)
         wanted_center_of_mass = k_size // 2 + 0.5 * (int(1 / scale_factor) - k_size % 2)
-        self.center = Variable(torch.FloatTensor([wanted_center_of_mass, wanted_center_of_mass]), requires_grad=False)
+        self.center = Variable(torch.FloatTensor([wanted_center_of_mass, wanted_center_of_mass]).to(device), requires_grad=False)
         self.loss = nn.MSELoss()
 
     def forward(self, kernel):
@@ -83,7 +84,7 @@ class BoundariesLoss(nn.Module):
     def __init__(self, k_size):
         super(BoundariesLoss, self).__init__()
         self.mask = map2tensor(create_penalty_mask(k_size, 30))
-        self.zero_label = Variable(torch.zeros(k_size), requires_grad=False)
+        self.zero_label = Variable(torch.zeros(k_size).to(device), requires_grad=False)
         self.loss = nn.L1Loss()
 
     def forward(self, kernel):
